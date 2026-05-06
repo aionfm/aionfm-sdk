@@ -4,7 +4,7 @@ use crate::{
     InterpretationRequest, ModelDescriptor, RequestOptions, ScenarioRequest, ServiceStatus,
 };
 use reqwest::{Method, StatusCode};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tracing::instrument;
 
 /// Typed asynchronous AionFM API client.
@@ -126,7 +126,10 @@ impl AionFmClient {
                         .text()
                         .await
                         .unwrap_or_else(|_| "unable to read error body".into());
-                    return Err(AionFmError::Api { status, message });
+                    return Err(AionFmError::Api {
+                        status,
+                        message: parse_api_error_message(&message),
+                    });
                 }
                 Err(error) if attempt < self.config.retry.max_retries => {
                     let backoff = self.config.retry.backoff_for(attempt);
@@ -144,6 +147,17 @@ fn should_retry(status: StatusCode) -> bool {
     status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
 }
 
+#[derive(Debug, Deserialize)]
+struct ApiErrorBody {
+    message: String,
+}
+
+fn parse_api_error_message(body: &str) -> String {
+    serde_json::from_str::<ApiErrorBody>(body)
+        .map(|body| body.message)
+        .unwrap_or_else(|_| body.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,5 +169,12 @@ mod tests {
             client.config.endpoint("/v1/status").unwrap().as_str(),
             "https://api.example.com/base/v1/status"
         );
+    }
+
+    #[test]
+    fn parses_standard_api_error_body() {
+        let message =
+            parse_api_error_message(r#"{"code":400,"error":"Bad Request","message":"invalid"}"#);
+        assert_eq!(message, "invalid");
     }
 }
