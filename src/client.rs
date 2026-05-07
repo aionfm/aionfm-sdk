@@ -47,6 +47,7 @@ impl AionFmClient {
                 return_regimes: options.return_regimes,
                 return_scenarios: options.return_scenarios,
                 enforce_constraints: options.enforce_constraints,
+                constraints: options.constraints,
                 use_retrieval: options.use_retrieval,
             },
         };

@@ -11,5 +11,5 @@ pub use client::AionFmClient;
 pub use config::{AionFmConfig, AuthConfig};
 pub use error::{AionFmError, AionFmResult};
 pub use models::*;
-pub use request::ForecastRequestBuilder;
+pub use request::{ForecastRequestBuilder, InterpretationRequestBuilder, ScenarioRequestBuilder};
 pub use retry::RetryPolicy;
