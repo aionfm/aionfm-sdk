@@ -2,7 +2,7 @@
 
 Typed async Rust SDK for the AionFM HTTP API described in `../aionfm-spec`.
 
-The SDK wraps forecast, scenario, interpretation, model-management, status, and adaptation endpoints while reusing the shared schema from `aionfm-utils`.
+The SDK wraps forecast, scenario, interpretation, evaluation, model-management, status, and adaptation endpoints while reusing the shared schema from `aionfm-utils`.
 
 ## Example
 

@@ -1,7 +1,7 @@
 use crate::{
     AionFmError, AionFmResult, BatchForecastRequest, ForecastConstraints, ForecastEntity,
-    ForecastOptions, ForecastRequest, InterpretationRequest, QuantileLevel, RequestOptions,
-    ScenarioRequest,
+    ForecastOptions, ForecastRequest, HierarchySpec, InterpretationRequest, QuantileLevel,
+    RequestOptions, ScenarioRequest,
 };
 
 /// Builder for batch forecast requests.
@@ -9,6 +9,7 @@ use crate::{
 pub struct ForecastRequestBuilder {
     entities: Vec<ForecastEntity>,
     options: ForecastOptions,
+    hierarchy: Option<HierarchySpec>,
 }
 
 /// Builder for scenario generation requests.
@@ -90,6 +91,7 @@ impl ForecastRequestBuilder {
         Self {
             entities: vec![],
             options: ForecastOptions::default(),
+            hierarchy: None,
         }
     }
 
@@ -140,6 +142,11 @@ impl ForecastRequestBuilder {
         self
     }
 
+    pub fn hierarchy(mut self, hierarchy: HierarchySpec) -> Self {
+        self.hierarchy = Some(hierarchy);
+        self
+    }
+
     pub fn build(self) -> AionFmResult<BatchForecastRequest> {
         let Some(first) = self.entities.first() else {
             return Err(AionFmError::Unexpected(
@@ -158,6 +165,7 @@ impl ForecastRequestBuilder {
                 enforce_constraints: self.options.enforce_constraints,
                 constraints: self.options.constraints,
                 use_retrieval: self.options.use_retrieval,
+                hierarchy: self.hierarchy,
             },
         })
     }
@@ -193,5 +201,40 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(request.scenario_type.as_deref(), Some("stress"));
+    }
+
+    #[test]
+    fn builder_attaches_hierarchy_and_retrieval_options() {
+        let parent = ForecastEntity {
+            entity_id: "parent".into(),
+            target: "value".into(),
+            historical_values: vec![3.0, 4.0],
+            frequency: Default::default(),
+            covariates: vec![],
+            metadata: Default::default(),
+        };
+        let child = ForecastEntity {
+            entity_id: "child".into(),
+            target: "value".into(),
+            historical_values: vec![1.0, 2.0],
+            frequency: Default::default(),
+            covariates: vec![],
+            metadata: Default::default(),
+        };
+        let request = ForecastRequestBuilder::new()
+            .entities([parent, child])
+            .horizon(2)
+            .use_retrieval(true)
+            .hierarchy(HierarchySpec {
+                relations: vec![crate::HierarchyRelation {
+                    parent_entity_id: "parent".into(),
+                    child_entity_ids: vec!["child".into()],
+                }],
+                ..Default::default()
+            })
+            .build()
+            .unwrap();
+        assert!(request.options.use_retrieval);
+        assert_eq!(request.options.hierarchy.unwrap().relations.len(), 1);
     }
 }

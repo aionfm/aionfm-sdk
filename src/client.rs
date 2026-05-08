@@ -1,7 +1,8 @@
 use crate::{
     AdaptationRequest, AdaptationStatus, AionFmConfig, AionFmError, AionFmResult,
-    BatchForecastRequest, ForecastEntity, ForecastOptions, ForecastRequest, ForecastResponse,
-    InterpretationRequest, ModelDescriptor, RequestOptions, ScenarioRequest, ServiceStatus,
+    BatchForecastRequest, EvaluationReport, EvaluationRequest, ForecastEntity, ForecastOptions,
+    ForecastRequest, ForecastResponse, InterpretationRequest, ModelDescriptor, RequestOptions,
+    ScenarioRequest, ServiceStatus,
 };
 use reqwest::{Method, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -49,6 +50,7 @@ impl AionFmClient {
                 enforce_constraints: options.enforce_constraints,
                 constraints: options.constraints,
                 use_retrieval: options.use_retrieval,
+                hierarchy: None,
             },
         };
         self.forecast_batch(request).await
@@ -78,6 +80,12 @@ impl AionFmClient {
         request: InterpretationRequest,
     ) -> AionFmResult<ForecastResponse> {
         self.send_json(Method::POST, "/v1/interpretation", Some(&request))
+            .await
+    }
+
+    #[instrument(skip(self, request))]
+    pub async fn evaluate(&self, request: EvaluationRequest) -> AionFmResult<EvaluationReport> {
+        self.send_json(Method::POST, "/v1/evaluate", Some(&request))
             .await
     }
 
