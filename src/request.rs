@@ -1,7 +1,7 @@
 use crate::{
     AionFmError, AionFmResult, BatchForecastRequest, ForecastConstraints, ForecastEntity,
     ForecastOptions, ForecastRequest, HierarchySpec, InterpretationRequest, QuantileLevel,
-    RequestOptions, ScenarioRequest,
+    RequestContext, RequestOptions, ScenarioRequest,
 };
 
 /// Builder for batch forecast requests.
@@ -10,6 +10,7 @@ pub struct ForecastRequestBuilder {
     entities: Vec<ForecastEntity>,
     options: ForecastOptions,
     hierarchy: Option<HierarchySpec>,
+    context: Option<RequestContext>,
 }
 
 /// Builder for scenario generation requests.
@@ -17,6 +18,7 @@ pub struct ForecastRequestBuilder {
 pub struct ScenarioRequestBuilder {
     forecast: ForecastRequestBuilder,
     scenario_type: Option<String>,
+    scenario_count: Option<usize>,
     forced_regimes: Vec<String>,
 }
 
@@ -35,14 +37,24 @@ impl ScenarioRequestBuilder {
         self
     }
 
+    pub fn scenario_count(mut self, count: usize) -> Self {
+        self.scenario_count = Some(count);
+        self
+    }
+
     pub fn forced_regime(mut self, regime: impl Into<String>) -> Self {
         self.forced_regimes.push(regime.into());
         self
     }
 
     pub fn build(self) -> AionFmResult<ScenarioRequest> {
+        let mut forecast = self.forecast.build()?;
+        if let Some(count) = self.scenario_count {
+            forecast.scenario_count = Some(count);
+            forecast.options.return_scenarios = true;
+        }
         Ok(ScenarioRequest {
-            forecast: self.forecast.build()?,
+            forecast,
             scenario_type: self.scenario_type,
             forced_regimes: self.forced_regimes,
         })
@@ -92,6 +104,7 @@ impl ForecastRequestBuilder {
             entities: vec![],
             options: ForecastOptions::default(),
             hierarchy: None,
+            context: None,
         }
     }
 
@@ -147,6 +160,11 @@ impl ForecastRequestBuilder {
         self
     }
 
+    pub fn context(mut self, context: RequestContext) -> Self {
+        self.context = Some(context);
+        self
+    }
+
     pub fn build(self) -> AionFmResult<BatchForecastRequest> {
         let Some(first) = self.entities.first() else {
             return Err(AionFmError::Unexpected(
@@ -155,6 +173,7 @@ impl ForecastRequestBuilder {
         };
         Ok(BatchForecastRequest {
             request_id: ForecastRequest::new(first.clone(), self.options.clone()).request_id,
+            context: self.context,
             entities: self.entities,
             horizon: self.options.horizon,
             quantiles: self.options.quantiles,
@@ -198,9 +217,12 @@ mod tests {
                     .scenarios(3),
             )
             .scenario_type("stress")
+            .scenario_count(5)
             .build()
             .unwrap();
         assert_eq!(request.scenario_type.as_deref(), Some("stress"));
+        assert_eq!(request.forecast.scenario_count, Some(5));
+        assert!(request.forecast.options.return_scenarios);
     }
 
     #[test]
@@ -232,9 +254,17 @@ mod tests {
                 }],
                 ..Default::default()
             })
+            .context(RequestContext {
+                tenant_id: Some("tenant_a".into()),
+                ..Default::default()
+            })
             .build()
             .unwrap();
         assert!(request.options.use_retrieval);
         assert_eq!(request.options.hierarchy.unwrap().relations.len(), 1);
+        assert_eq!(
+            request.context.unwrap().tenant_id.as_deref(),
+            Some("tenant_a")
+        );
     }
 }

@@ -40,6 +40,7 @@ impl AionFmClient {
     ) -> AionFmResult<ForecastResponse> {
         let request = BatchForecastRequest {
             request_id: ForecastRequest::new(entity.clone(), options.clone()).request_id,
+            context: None,
             entities: vec![entity],
             horizon: options.horizon,
             quantiles: options.quantiles,
